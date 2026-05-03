@@ -1,0 +1,24 @@
+
+// Таблица: parking_zones
+Table parking_zones {
+  pz_id int [pk, increment] // primary key, auto_increment
+  district varchar(255) [not null] // округ/область
+  address varchar(255) [null] // точный адрес
+  is_paid boolean [not null] // true - оплачиваемая, false - бесплатная
+  storeys_count int [not null] // количество этажей
+  max_places int [not null] // максимальное количество парковочных мест
+  // Примечания
+  Note: 'Таблица с информацией о парковочных зонах'
+}
+
+// Таблица: parking_history
+Table parking_history {
+  id int [pk, increment] // primary key, auto_increment
+  pz_id int [not null, ref: > parking_zones.pz_id] // foreign key to parking_zones
+  storey int [not null] // этаж (от 1 до storeys_count)
+  action varchar(10) [not null] // въезд | выезд
+  rate float [null] // тариф при въезде (опционально)
+  ts timestamp [not null] // дата и время действия
+  // Примечания
+  Note: 'Таблица с историей всех парковок'
+}

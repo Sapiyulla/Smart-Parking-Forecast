@@ -1,0 +1,31 @@
+[0m14:54:52.305881 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f94b5d0b590>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f94b2fbd5d0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f94b30cd310>]}
+
+
+============================== 14:54:52.382315 | 5c71d108-669f-4383-bcda-26bf46581ac6 ==============================
+[0m14:54:52.382315 [info ] [MainThread]: Running with dbt=1.11.8
+[0m14:54:52.387119 [debug] [MainThread]: running dbt with arguments {'partial_parse': 'True', 'version_check': 'True', 'use_experimental_parser': 'False', 'quiet': 'False', 'write_json': 'True', 'empty': 'None', 'target_path': 'None', 'log_format': 'default', 'profiles_dir': '/home/airflow/.dbt', 'cache_selected_only': 'False', 'static_parser': 'True', 'indirect_selection': 'eager', 'log_cache_events': 'False', 'warn_error': 'None', 'introspect': 'True', 'printer_width': '80', 'fail_fast': 'False', 'log_path': 'logs', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'send_anonymous_usage_stats': 'True', 'debug': 'False', 'no_print': 'None', 'invocation_command': 'dbt init', 'use_colors': 'True'}
+[0m14:54:52.482845 [info ] [MainThread]: Creating dbt configuration folder at /home/airflow/.dbt
+[0m14:55:30.586924 [debug] [MainThread]: Starter project path: /home/airflow/.local/lib/python3.11/site-packages/dbt/include/starter_project
+[0m14:55:30.809483 [info ] [MainThread]: 
+Your new dbt project "data_transform" was created!
+
+For more information on how to configure the profiles.yml file,
+please consult the dbt documentation here:
+
+  https://docs.getdbt.com/docs/configure-your-profile
+
+One more thing:
+
+Need help? Don't hesitate to reach out to us via GitHub issues or on Slack:
+
+  https://community.getdbt.com/
+
+Happy modeling!
+
+[0m14:55:30.812015 [info ] [MainThread]: Setting up your profile.
+[0m14:56:56.066332 [info ] [MainThread]: Profile data_transform written to /home/airflow/.dbt/profiles.yml using target's profile_template.yml and your supplied values. Run 'dbt debug' to validate the connection.
+[0m14:56:56.091618 [debug] [MainThread]: Resource report: {"command_name": "init", "command_success": true, "command_wall_clock_time": 123.8718, "process_in_blocks": "1112", "process_kernel_time": 0.375968, "process_mem_max_rss": "121872", "process_out_blocks": "1080", "process_user_time": 2.945817}
+[0m14:56:56.098648 [debug] [MainThread]: Command `dbt init` succeeded at 14:56:56.098065 after 123.89 seconds
+[0m14:56:56.104031 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f94b2ca2350>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f94b7610f50>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f94b7610c90>]}
+[0m14:56:56.113103 [debug] [MainThread]: Flushing usage events
+[0m14:56:57.073878 [debug] [MainThread]: An error was encountered while trying to flush usage events
