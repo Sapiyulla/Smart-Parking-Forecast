@@ -1,24 +1,29 @@
-
 x-airflow-common: &airflow-common
   build:
     context: ./airflow
     dockerfile: Dockerfile
-  environment: &airflow-common-env
+  environment:
     # Базовые настройки
+    &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflowdb/airflow
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
     AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
-    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-    AIRFLOW__CORE__HOSTNAME_CALLABLE: socket.gethostname
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
     AIRFLOW__API_AUTH__JWT_SECRET: "airflow"
-    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
-    AIRFLOW_CONN_PG_DEFAULT: 'postgres://oltp:oltp@oltp:5432/smart_parking'
+    AIRFLOW__API__BASE_URL: "http://localhost:8080"
+    AIRFLOW__LOGGING__REMOTE_LOGGING: "False"
+    AIRFLOW__LOGGING__TASK_LOG_READER: "file.task"
+    AIRFLOW__LOGGING__WORKER_LOG_SERVER_PORT: "8793"
+    AIRFLOW__LOGGING__BASE_LOG_FOLDER: "/opt/airflow/logs"
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-apiserver:8080/execution/"
+    AIRFLOW_CONN_PG_DEFAULT: "postgres://oltp:oltp@oltp:5432/smart_parking"
   user: "${AIRFLOW_UID:-50000}:0"
   volumes:
-    - ./airflow/dags:/opt/airflow/dags
-    - ./airflow/logs:/opt/airflow/logs
-    - ./scripts/oltp/generators:/opt/airflow/generators
+  - ./airflow/dags:/opt/airflow/dags
+  - ./airflow/logs:/opt/airflow/logs
+  - ./scripts/oltp/generators:/opt/airflow/generators
 
 services:
   oltp:
@@ -26,20 +31,22 @@ services:
     container_name: oltp
     hostname: oltp
     ports:
-      - "5432:5432"
+    - "5432:5432"
     environment:
       POSTGRES_USER: ${OLTP_USER}
       POSTGRES_PASSWORD: ${OLTP_PASSWORD}
       POSTGRES_DB: ${OLTP_DB}
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${OLTP_USER}", "-d", "${OLTP_DB}"]
+      test: [ "CMD", "pg_isready", "-U", "${OLTP_USER}", "-d", "${OLTP_DB}" ]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/oltp/init:/docker-entrypoint-initdb.d/
+    - postgres_data:/var/lib/postgresql/data
+    - ./scripts/oltp/init:/docker-entrypoint-initdb.d/
+    networks:
+    - smartparking
 
   oltp-init:
     build:
@@ -49,7 +56,9 @@ services:
     depends_on:
       oltp:
         condition: service_healthy
-    
+    networks:
+    - smartparking
+
   airflow-db:
     image: postgres:15-alpine
     container_name: airflow-db
@@ -59,29 +68,31 @@ services:
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
+      test: [ "CMD", "pg_isready", "-U", "airflow" ]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
-      
+    networks:
+    - smartparking
+
   airflow-init:
     <<: *airflow-common
     container_name: airflow-init
     entrypoint: /bin/bash
     command:
-      - -c
-      - |
-        echo "Running DB migrations..."
-        /entrypoint airflow db migrate
-        echo "Creating admin user (if not exists)..."
-        /entrypoint airflow users create \
-          --username "${_AIRFLOW_WWW_USER_USERNAME:-airflow}" \
-          --password "${_AIRFLOW_WWW_USER_PASSWORD:-airflow}" \
-          --firstname Admin \
-          --lastname User \
-          --role Admin \
-          --email admin@example.com
+    - -c
+    - |
+      echo "Running DB migrations..."
+      /entrypoint airflow db migrate
+      echo "Creating admin user (if not exists)..."
+      /entrypoint airflow users create \
+        --username "${_AIRFLOW_WWW_USER_USERNAME:-airflow}" \
+        --password "${_AIRFLOW_WWW_USER_PASSWORD:-airflow}" \
+        --firstname Admin \
+        --lastname User \
+        --role Admin \
+        --email admin@example.com
     environment:
       <<: *airflow-common-env
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
@@ -89,36 +100,59 @@ services:
     depends_on:
       airflow-db:
         condition: service_healthy
+    healthcheck:
+      start_period: 5s
+    networks:
+    - smartparking
 
   airflow-scheduler:
     <<: *airflow-common
     container_name: airflow-scheduler
+    hostname: airflow-scheduler
     command: scheduler
     environment:
       <<: *airflow-common-env
     depends_on:
       airflow-init:
         condition: service_completed_successfully
-  
+    healthcheck:
+      start_period: 5s
+    networks:
+    - smartparking
+
   airflow-apiserver:
     <<: *airflow-common
     container_name: airflow-apiserver
     hostname: airflow-apiserver
     command: api-server
     ports:
-      - "8080:8080"
+    - "8080:8080"
     depends_on:
       airflow-init:
         condition: service_completed_successfully
+    healthcheck:
+      start_period: 5s
+    networks:
+    - smartparking
 
   airflow-dag-processor:
     <<: *airflow-common
     container_name: airflow-dag-processor
+    hostname: airflow-dag-processor
     command: dag-processor
     depends_on:
       airflow-init:
         condition: service_completed_successfully
-
+    healthcheck:
+      start_period: 5s
+    networks:
+    - smartparking
 
 volumes:
   postgres_data:
+
+
+networks:
+  smartparking:
+    driver: bridge
+    name: smartparking_network

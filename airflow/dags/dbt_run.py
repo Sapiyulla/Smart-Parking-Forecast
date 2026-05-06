@@ -17,8 +17,8 @@ profile_config = ProfileConfig(
     )
 )
 
-dbt_run = DbtDag(
-    dag_id="smart_parking_staging",
+dbt_run_stg = DbtDag(
+    dag_id="smart_parking",
     schedule="0 19 * * 5",
     start_date=datetime(2025, 1, 1),
     catchup=False,
