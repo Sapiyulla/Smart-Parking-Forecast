@@ -1,0 +1,21 @@
+mae: 1.41
+mape: !!python/object/apply:numpy._core.multiarray.scalar
+- !!python/object/apply:numpy.dtype
+  args:
+  - f8
+  - false
+  - true
+  state: !!python/tuple
+  - 3
+  - <
+  - null
+  - null
+  - null
+  - -1
+  - -1
+  - 0
+- !!binary |
+  pHA9CtejLEA=
+test_rows: 218
+train_rows: 868
+trained_at: '2026-05-10T10:57:32.733959'

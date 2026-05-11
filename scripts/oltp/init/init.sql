@@ -20,3 +20,17 @@ CREATE TABLE IF NOT EXISTS parkings (
     ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (pz_id) REFERENCES parking_zones(pz_id)
 );
+
+CREATE SCHEMA IF NOT EXISTS staging;
+
+CREATE TABLE IF NOT EXISTS staging.fct_predictions (
+    prediction_id SERIAL PRIMARY KEY,
+    pz_id INTEGER,
+    forecast_ts TIMESTAMP NOT NULL,
+    predicted_occupancy_pct FLOAT,
+    predicted_at TIMESTAMP DEFAULT NOW()
+);
+
+ALTER TABLE staging.fct_predictions 
+ADD CONSTRAINT fk_predictions_parking_zone 
+FOREIGN KEY (pz_id) REFERENCES public.parking_zones(pz_id);

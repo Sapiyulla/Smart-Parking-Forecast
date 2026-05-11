@@ -22,6 +22,9 @@ dbt_run_stg = DbtDag(
     schedule="0 19 * * 5",
     start_date=datetime(2025, 1, 1),
     catchup=False,
+    params={
+        'full_refresh': 'true'
+    },
     project_config=ProjectConfig(DBT_PROJECT_PATH),
     profile_config=profile_config,
     execution_config=ExecutionConfig(dbt_executable_path=DBT_EXEC_PATH),

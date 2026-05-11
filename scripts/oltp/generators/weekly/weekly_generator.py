@@ -28,55 +28,70 @@ dirt_cfg = config["dirt"]
 lp_cfg = config["load_pattern"]
 
 # =============================================
-# Определение периода: прошлая пятница 18:00 → текущая пятница 18:00
-# =============================================
-now = datetime.now()
-# Ближайшая пятница 18:00 (сегодня или уже прошла — берём текущую неделю)
-days_since_friday = (now.weekday() - 4) % 7
-current_friday_18 = now.replace(hour=18, minute=0, second=0, microsecond=0) - timedelta(days=days_since_friday)
-if now < current_friday_18:
-    # Если сейчас до 18:00 пятницы — сдвигаем на неделю назад
-    current_friday_18 -= timedelta(weeks=1)
-
-previous_friday_18 = current_friday_18 - timedelta(weeks=1)
-
-log.info(f"[config] Generation period: {previous_friday_18} → {current_friday_18}")
-
-# =============================================
-# Подключение к БД, получение parking_zones
+# Определение периода: последняя запись в БД → текущий час
 # =============================================
 log.info("[postgres] Connecting to OLTP database...")
 conn = psycopg2.connect(**db_cfg)
 cur = conn.cursor()
+
+# Находим последнюю временную метку в parkings
+cur.execute("SELECT MAX(ts) FROM parkings")
+last_ts = cur.fetchone()[0]
+
+if last_ts is None:
+    # Если таблица пуста — начинаем с трёх лет назад (историческая генерация ещё не запускалась)
+    log.warning("[postgres] Table 'parkings' is empty. Fallback to 3 years ago.")
+    last_ts = datetime.now() - timedelta(days=3 * 365)
+
+# Округляем до начала следующего часа
+start_ts = last_ts.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+
+# Конец периода — начало текущего часа
+end_ts = datetime.now().replace(minute=0, second=0, microsecond=0)
+
+# Если после последней записи прошло меньше часа — генерировать нечего
+if start_ts >= end_ts:
+    log.info(f"[config] No new data to generate. Last ts: {last_ts}, current hour: {end_ts}")
+    cur.close()
+    conn.close()
+    exit(0)
+
+log.info(f"[config] Generation period: {last_ts} → {end_ts} (start: {start_ts})")
+
+# =============================================
+# Получение parking_zones
+# =============================================
 cur.execute("SELECT pz_id, max_places, storeys_count, is_paid FROM parking_zones")
 zones = {row[0]: {"max_places": row[1], "storeys": row[2], "is_paid": row[3]} for row in cur.fetchall()}
 pz_ids = list(zones.keys())
-log.info("[postgres] Connected.")
+log.info("[postgres] Parking zones loaded.")
 
 # =============================================
 # Вычисление количества записей
 # =============================================
-total_records = gen_cfg["min_records"] + random.randint(0, gen_cfg["records_range"])
-log.info(f"[config] Target records: {total_records}")
+hours_diff = (end_ts - start_ts).total_seconds() / 3600
+# Пропорционально количеству часов: чем больше разрыв, тем больше записей
+base_records = gen_cfg["min_records"] + random.randint(0, gen_cfg["records_range"])
+total_records = max(100, int(base_records * (hours_diff / 168)))  # 168 часов в неделе
+log.info(f"[config] Hours since last record: {hours_diff:.1f}h, target records: {total_records}")
 
 # =============================================
 # Определение начальной занятости
 # =============================================
-# Получаем последнее известное состояние на конец предыдущей недели
 occupied = {}
 for pz_id in pz_ids:
     cur.execute("""
         SELECT COUNT(*) FILTER (WHERE action = 'entrance') - COUNT(*) FILTER (WHERE action = 'exit')
         FROM parkings
         WHERE pz_id = %s AND ts <= %s
-    """, (pz_id, previous_friday_18))
+    """, (pz_id, last_ts))
     balance = cur.fetchone()[0] or 0
     occupied[pz_id] = max(0, min(balance, zones[pz_id]["max_places"]))
 
 log.info("[postgres] Initial occupancy calculated.")
 
 # =============================================
-# Вспомогательные функции (идентичны историческому генератору)
+# Вспомогательные функции
 # =============================================
 def get_hour_factor(hour):
     if hour in lp_cfg["night_hours"]:
@@ -111,11 +126,11 @@ def probability_of_event(pz_id, ts):
 # Генерация событий
 # =============================================
 events = []
-ts_current = previous_friday_18
-delta = (current_friday_18 - previous_friday_18) / total_records
+ts_current = start_ts
+delta = (end_ts - start_ts) / total_records if total_records > 0 else timedelta(hours=1)
 
 log.info("[generator] Generating events...")
-while ts_current < current_friday_18:
+while ts_current < end_ts:
     pz_id = random.choice(pz_ids)
     storey = random.randint(1, zones[pz_id]["storeys"])
     zone = zones[pz_id]
@@ -147,6 +162,11 @@ log.info(f"[generator] Base events generated: {len(events)}")
 # Внесение грязи
 # =============================================
 n = len(events)
+if n == 0:
+    log.info("[generator] No events to dirty. Exiting.")
+    cur.close()
+    conn.close()
+    exit(0)
 
 # 1. Orphan exits
 orphan_count = int(n * dirt_cfg["orphan_exit_pct"] / 100)
@@ -177,7 +197,7 @@ log.info(f"[dirt] Negative durations added: {neg_count}")
 # 4. Missing hours
 missing_hours = []
 for _ in range(dirt_cfg["missing_hours"]):
-    hour_start = previous_friday_18 + timedelta(hours=random.randint(0, 167))
+    hour_start = start_ts + timedelta(hours=random.randint(0, max(0, int(hours_diff) - 1)))
     missing_hours.append(hour_start.replace(minute=0, second=0, microsecond=0))
 
 events = [e for e in events 
@@ -209,4 +229,4 @@ conn.close()
 
 log.info("[postgres] Inserting done.")
 log.info(f"\nGeneration done. Total records inserted: {len(events)}")
-log.info(f"Period: {previous_friday_18} → {current_friday_18}")
+log.info(f"Period: {start_ts} → {end_ts}")

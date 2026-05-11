@@ -1,21 +1,38 @@
 FROM apache/airflow:slim-3.2.1-python3.11
 
 USER root
-# Переключиться на root для создания папок
-RUN mkdir -p /opt/airflow/logs && chown -R airflow /opt/airflow/logs
-# Устанавливаем libpq — она нужна для работы с Postgres даже в slim
+
+# Системные зависимости для LightGBM
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends libpq5 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-# Вернуться к пользователю airflow
+    apt-get install -y --no-install-recommends \
+    libgomp1 \
+    build-essential \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Создаём все нужные директории
+RUN mkdir -p /opt/airflow/ml/{config,model,data,logs} \
+    && mkdir -p /opt/airflow/ml/model/{metrics,artifacts} \
+    && chown -R airflow:root /opt/airflow/ml
+
 USER airflow
-# Устанавливаем готовые бинарные сборки (binary), чтобы не мучиться с gcc
+
+# Установка Python-пакетов (добавлен asyncpg)
 RUN pip install --no-cache-dir \
-    pyyaml \
-    psycopg2-binary \
+    apache-airflow \
     asyncpg \
+    lightgbm \
+    pandas \
+    numpy \
+    pyyaml \
+    scikit-learn \
+    sqlalchemy \
+    psycopg2-binary \
     apache-airflow-providers-fab \
     astronomer-cosmos \
     dbt-postgres \
     apache-airflow-providers-postgres
+
+# Копируем ваши файлы (если они на хосте)
+COPY --chown=airflow:root ml /opt/airflow/ml/
+COPY --chown=airflow:root airflow/dags /opt/airflow/dags/

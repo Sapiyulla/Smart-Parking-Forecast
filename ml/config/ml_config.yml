@@ -1,0 +1,22 @@
+database:
+  host: "oltp"
+  port: 5432
+  dbname: "smart_parking"
+  user: "oltp"
+  password: "oltp"
+
+model:
+  features:
+  - "lag_1h"
+  - "lag_24h"
+  - "lag_168h"
+  - "rolling_avg_7d"
+  - "hour"
+  - "day_of_week"
+  - "is_weekend"
+  - "month"
+  target: "occupancy_pct"
+  test_split_pct: 0.2
+  model_path: "/opt/airflow/ml/model/artifacts/model.pkl"
+  metrics_path: "/opt/airflow/ml/model/metrics/metrics.json"
+  forecast_horizon_hours: 24
